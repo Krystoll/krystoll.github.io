@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Калькулятор ущерба от пожара</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: расчётный лист модели системной динамики — шаги методики идут вкладками слева направо: данные → связи → проверка → планы */
+:root{
+  --bg:#f2f3f1; --panel:#ffffff; --ink:#1d2322; --muted:#5d6866; --line:#d6dbd8; --soft:#e8ebe9;
+  --ember:#b5441d; --ember-soft:#f6e3da; --steel:#2f5d7c; --ok:#2e7d4f; --warn:#a86a00;
+  --c1:#b5441d; --c2:#2f5d7c; --c3:#2e7d4f; --c4:#7a4f9a; --c5:#a86a00; --c6:#566573; --c7:#17867a;
+  --f-ui:"Golos Text",system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --f-num:"JetBrains Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#141817; --panel:#1c2120; --ink:#e6eae8; --muted:#9aa5a2; --line:#323a38; --soft:#252b2a;
+  --ember:#e2774f; --ember-soft:#3a241b; --steel:#7fb0d3; --ok:#6cc092; --warn:#e0a43c;
+  --c1:#e2774f; --c2:#7fb0d3; --c3:#6cc092; --c4:#b996d8; --c5:#e0a43c; --c6:#a3b0bb; --c7:#4fc4b5; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141817; --panel:#1c2120; --ink:#e6eae8; --muted:#9aa5a2; --line:#323a38; --soft:#252b2a;
+  --ember:#e2774f; --ember-soft:#3a241b; --steel:#7fb0d3; --ok:#6cc092; --warn:#e0a43c;
+  --c1:#e2774f; --c2:#7fb0d3; --c3:#6cc092; --c4:#b996d8; --c5:#e0a43c; --c6:#a3b0bb; --c7:#4fc4b5; color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-ui);font-size:15px;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:14px;border-bottom:2px solid var(--ink)}
+h1{font-size:clamp(22px,3vw,30px);font-weight:700;margin:0;letter-spacing:-.01em;text-wrap:balance}
+.sub{color:var(--muted);margin:4px 0 0;max-width:78ch}
+.stamp{font-family:var(--f-num);font-size:12px;color:var(--muted);border:1px solid var(--line);padding:6px 10px;border-radius:4px;background:var(--panel)}
+ol.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;list-style:none;padding:0;margin:16px 0 0;counter-reset:s}
+ol.flow li{counter-increment:s;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px 10px 44px;position:relative;font-size:13.5px;color:var(--muted)}
+ol.flow li b{color:var(--ink);display:block;font-weight:600}
+ol.flow li::before{content:counter(s);position:absolute;left:12px;top:10px;width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--bg);font-weight:700;font-size:12px;display:grid;place-items:center}
+nav.tabs{display:flex;gap:4px;margin:18px 0 18px;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav.tabs button{font:inherit;font-weight:500;background:none;border:0;border-bottom:3px solid transparent;color:var(--muted);padding:10px 14px;cursor:pointer;white-space:nowrap}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ember)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--steel);outline-offset:2px}
+.stackcol{display:flex;flex-direction:column;gap:16px;min-width:0}
+.grid{display:grid;grid-template-columns:minmax(290px,360px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.grid{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;min-width:0}
+.card h2{font-size:16px;margin:0 0 6px;font-weight:600}
+.card h2 .f{font-family:var(--f-num);font-weight:400;font-size:12px;color:var(--muted);margin-left:6px}
+.card .lead{color:var(--muted);font-size:13.5px;margin:0 0 12px;max-width:90ch}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:5px 7px;text-align:left;vertical-align:middle}
+th{font-weight:600;color:var(--muted);font-size:12px}
+td.n,th.n{text-align:right;font-family:var(--f-num);font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.best td{background:color-mix(in srgb,var(--ok) 12%,transparent)}
+input[type=number],input[type=text],select{font:inherit;font-family:var(--f-num);font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:5px 6px;text-align:right;width:100%;min-width:0}
+input[type=text],select{text-align:left;font-family:var(--f-ui)}
+td input[type=number]{width:96px}
+input[type=range]{width:100%;accent-color:var(--ember)}
+.mx{border-collapse:separate;border-spacing:2px;font-size:12px}
+.mx th{font-family:var(--f-num);font-size:11px;text-align:center;padding:2px}
+.mx th.rh{text-align:left;white-space:nowrap}
+.mx td{padding:0}
+.mx button{width:30px;height:26px;border-radius:3px;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-family:var(--f-num);font-size:12px;cursor:pointer}
+.mx button.p{background:color-mix(in srgb,var(--ember) 18%,var(--panel));color:var(--ember);border-color:color-mix(in srgb,var(--ember) 40%,var(--line));font-weight:700}
+.mx button.m{background:color-mix(in srgb,var(--steel) 18%,var(--panel));color:var(--steel);border-color:color-mix(in srgb,var(--steel) 40%,var(--line));font-weight:700}
+.mx td.sep{border-left:2px solid var(--ink)}
+.eqs{font-family:var(--f-num);font-size:12.5px;line-height:1.7;background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:12px 14px;overflow-x:auto;white-space:pre;max-height:460px;overflow-y:auto;margin:0}
+.btn{font:inherit;font-weight:500;border:1px solid var(--ink);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:4px;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.note{font-size:12.5px;color:var(--muted);margin:8px 0 0}
+.status{font-size:13px;font-weight:500}
+.status.ok{color:var(--ok)} .status.busy{color:var(--warn)} .status.dirty{color:var(--ember)}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px}
+.pill.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}
+.pill.bad{background:var(--ember-soft);color:var(--ember)}
+.pill.mid{background:color-mix(in srgb,var(--warn) 16%,transparent);color:var(--warn)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.kpi{border-left:3px solid var(--line);padding:2px 0 2px 10px}
+.kpi .v{font-family:var(--f-num);font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+.kpi .k{font-size:12px;color:var(--muted)}
+.chart{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-ui);font-size:11px}
+.chart .axis{stroke:var(--line)} .chart .grid{stroke:var(--soft)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:3px}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 110px;gap:8px;align-items:center;padding:3px 0;font-size:14px}
+.row:has(select){grid-template-columns:minmax(0,1fr) 190px}
+.row small{display:block;color:var(--muted);font-size:12px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 12px}
+.pgrid label{display:grid;grid-template-columns:minmax(0,1fr) 64px;gap:6px;align-items:center;font-size:12.5px}
+.pgrid label span{font-family:var(--f-num)}
+fieldset{border:0;border-top:1px solid var(--line);margin:0;padding:12px 0 4px}
+legend{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ember);padding:0 0 6px}
+footer{margin-top:28px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line);padding-top:12px;max-width:100ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+<header class="top">
+  <div>
+    <h1>Калькулятор ущерба от пожара</h1>
+    <p class="sub">Модель системной динамики последствий пожаров на промышленных предприятиях: статистика МЧС России за 2015–2022 гг., матрица причинно-следственных связей, квадратичные полиномы, система дифференциальных уравнений и выбор плана мероприятий по критерию минимума целевой функции.</p>
+  </div>
+  <div class="stamp">Переменные нормированы на максимум за 2015–2022 гг. · t = (год − 2015)/10</div>
+</header>
+
+<ol class="flow">
+  <li><b>Данные</b>Статистика X₁–X₁₅ нормируется: X̃ = X / X_max.</li>
+  <li><b>Связи и полиномы</b>По матрице связей (+1 / −1) для каждой пары подбирается f(X̃_j) = β₀ + β₁X̃_j + β₂X̃_j².</li>
+  <li><b>Проверка модели</b>Система (3) решается методом Рунге — Кутты 4-го порядка, результат сравнивается с данными.</li>
+  <li><b>Планы мероприятий</b>Для каждого плана считается целевая функция; лучший план даёт минимум.</li>
+</ol>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" id="t-data" aria-selected="true" data-tab="data">1. Данные</button>
+  <button role="tab" id="t-links" aria-selected="false" data-tab="links">2. Связи и полиномы</button>
+  <button role="tab" id="t-check" aria-selected="false" data-tab="check">3. Проверка модели</button>
+  <button role="tab" id="t-plans" aria-selected="false" data-tab="plans">4. Планы и целевая функция</button>
+</nav>
+
+<div class="card" style="margin-bottom:16px">
+  <div class="btns" style="justify-content:space-between">
+    <div class="btns"><span class="status ok" id="status">Модель построена по исходным данным</span></div>
+    <div class="btns"><button class="btn" type="button" id="rebuild">Пересчитать модель</button><button class="btn ghost" type="button" id="resetAll">Вернуть исходные данные</button></div>
+  </div>
+  <p class="note">После изменения статистики или матрицы связей нажмите «Пересчитать модель»: заново подбираются полиномы и коэффициенты α_i, β_i (калибровка занимает 1–3 секунды).</p>
+</div>
+
+<!-- TAB 1 -->
+<section id="p-data" class="stackcol">
+  <div class="card"><h2>Статистика пожаров на промышленных предприятиях</h2>
+    <p class="lead">Значения из сборников «Пожары и пожарная безопасность» (2015–2022). X₁, X₂ — человек, X₃–X₁₅ — тыс. руб. Ячейки можно изменить.</p>
+    <div class="tbl"><table id="tRaw"></table></div></div>
+  <div class="card"><h2>Нормированные значения <span class="f">X̃ = X / X_max</span></h2>
+    <p class="lead">Значения 2015 года — начальные условия системы. Значения по годам используются для подбора полиномов и проверки модели.</p>
+    <div class="tbl"><table id="tNorm"></table></div></div>
+</section>
+
+<!-- TAB 2 -->
+<section id="p-links" class="stackcol" hidden>
+  <div class="card"><h2>Матрица причинно-следственных связей <span class="f">U_ij, (1)</span></h2>
+    <p class="lead">Строка — характеристика X_i, на которую влияют; столбец — влияющая характеристика X_j или внешний фактор E_k. Щелчок по ячейке меняет значение: 0 → +1 → −1 → 0.</p>
+    <div class="tbl"><table class="mx" id="tMx"></table></div>
+    <p class="note" id="mxNames"></p></div>
+  <div class="card"><h2>Система дифференциальных уравнений <span class="f">(2)–(3)</span></h2>
+    <p class="lead">dX_i/dt = α_i·(1 − p_i)·∏ f_ij(X_j⁺)·ΣE⁺ − β_i·∏ f_ij(X_j⁻)·ΣE⁻. Коэффициенты α_i, β_i играют роль множителя 1/X_i^norm и подобраны МНК так, чтобы решение системы было ближе всего к данным 2015–2022 гг.; p_i — управляющее воздействие плана (0 — без мероприятий).</p>
+    <pre class="eqs" id="eqs"></pre></div>
+  <div class="card"><h2>Квадратичные полиномы <span class="f">f_j(X̃_j) = β₀ + β₁X̃_j + β₂X̃_j²</span></h2>
+    <p class="lead">Каждый полином — регрессия МНК нормированной X̃_i на X̃_j по восьми годам. R² показывает качество подгонки. Отрицательные значения полинома принимаются равными нулю.</p>
+    <div class="tbl"><table id="tPoly"></table></div></div>
+</section>
+
+<!-- TAB 3 -->
+<section id="p-check" class="grid" hidden>
+  <div class="stackcol">
+    <div class="card"><h2>Точность модели</h2>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kX13">—</div><div class="k">Средняя погрешность X₁–X₃</div></div>
+        <div class="kpi"><div class="v" id="kAll">—</div><div class="k">Средняя погрешность X₁–X₁₅</div></div>
+        <div class="kpi"><div class="v" id="kSse">—</div><div class="k">Сумма квадратов отклонений</div></div>
+      </div>
+      <p class="note">δ_i(t) = 100·|X̃_модель − X̃_факт| / X̃_факт. Последствия (X₁–X₃) меняются плавно и воспроизводятся точнее; причины пожаров (взрывы, грозы, поджоги) — случайные события, модель передаёт их тренд, а не скачки по годам.</p>
+    </div>
+    <div class="card"><h2>Переменная</h2>
+      <select id="selVar" aria-label="Переменная для графика"></select>
+      <div class="legend"><span><i style="background:var(--c2)"></i>модель</span><span><i style="background:var(--c1);height:8px;width:8px;border-radius:50%"></i>статистика МЧС</span></div>
+    </div>
+  </div>
+  <div class="stackcol">
+    <div class="card"><h2>Модель и фактические данные</h2><svg class="chart" id="chFit" viewBox="0 0 640 280" role="img" aria-label="Сравнение модели с данными"></svg></div>
+    <div class="card"><h2>Траектории всех переменных <span class="f">2015–2022</span></h2><svg class="chart" id="chAll" viewBox="0 0 640 300" role="img" aria-label="Траектории переменных"></svg><div class="legend" id="legAll"></div></div>
+    <div class="card"><h2>Погрешность по годам, %</h2><div class="tbl"><table id="tErr"></table></div></div>
+  </div>
+</section>
+
+<!-- TAB 4 -->
+<section id="p-plans" class="grid" hidden>
+  <div class="stackcol">
+    <div class="card"><h2>Целевая функция</h2>
+      <p class="lead" style="font-family:var(--f-num);font-size:12.5px">J = ∫ Σ γ_i·(X_i(t) − X_i*)² dt → min</p>
+      <div class="row"><label for="horizon">Конец интервала, год</label><select id="horizon"></select></div>
+      <div class="row"><label for="tStart">Начало интервала, год</label><select id="tStart"><option value="0.7">2022 — начало мероприятий</option><option value="0">2015 — весь интервал</option></select></div>
+      <div class="row"><label for="ramp">Срок ввода мероприятий, лет</label><input type="number" id="ramp" min="0" max="5" step="0.5" value="1"></div>
+      <div class="row"><label for="mode">Отклонение от X*</label><select id="mode"><option value="sym">в обе стороны (как в статье)</option><option value="over">только превышение X*</option></select></div>
+      <div class="row"><label for="preset">Допустимые значения X*</label><select id="preset"><option value="median">медиана 2015–2022</option><option value="mean">среднее 2015–2022</option><option value="last">значение 2022 г.</option></select></div>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:13px">X* и весовые коэффициенты γ_i</summary><div class="tbl"><table id="tLim"></table></div></details>
+    </div>
+    <div class="card"><h2>План мероприятий</h2>
+      <select id="selPlan" aria-label="Редактируемый план"></select>
+      <div class="row" style="margin-top:8px"><label for="planName">Название</label></div>
+      <input type="text" id="planName">
+      <fieldset style="margin-top:10px"><legend>Внешние факторы, множитель к 2022 г.</legend><div class="pgrid" id="planE"></div></fieldset>
+      <fieldset><legend>Снижение темпа роста p_i, доля 0–1</legend><div class="pgrid" id="planP"></div></fieldset>
+      <p class="note">p_i = 0,4 означает, что мероприятия плана снижают темп роста X_i на 40 %. Множитель E₂ = 1,3 — сил пожарной охраны на 30 % больше.</p>
+    </div>
+  </div>
+  <div class="stackcol">
+    <div class="card"><h2>Сравнение планов</h2>
+      <div id="bestBox" style="margin-bottom:10px"></div>
+      <div class="tbl"><table id="tJ"></table></div>
+      <svg class="chart" id="chJ" viewBox="0 0 640 170" role="img" aria-label="Значения целевой функции"></svg></div>
+    <div class="card"><h2>Прогноз переменной по планам</h2>
+      <select id="selVar2" aria-label="Переменная прогноза" style="max-width:420px"></select>
+      <svg class="chart" id="chPlan" viewBox="0 0 640 280" role="img" aria-label="Прогноз по планам"></svg><div class="legend" id="legPlan"></div></div>
+    <div class="card"><h2>Значения характеристик и допустимые уровни</h2>
+      <div class="btns" style="gap:12px"><select id="selPlanR" aria-label="План для диаграммы" style="max-width:300px"></select>
+        <label style="display:flex;gap:8px;align-items:center;flex:1;min-width:220px;font-size:13px">Год <input type="range" id="yearR" min="2015" max="2027" step="1" value="2027"><output id="yearRo" style="font-family:var(--f-num)">2027</output></label></div>
+      <svg class="chart" id="chRadar" viewBox="0 0 640 470" role="img" aria-label="Радиальная диаграмма"></svg>
+      <div class="legend"><span><i style="background:var(--c2)"></i>значения X̃_i(t) по плану</span><span><i style="background:var(--c1)"></i>допустимые значения X*_i</span></div>
+      <p class="note" id="radarNote"></p></div>
+  </div>
+</section>
+
+<footer>Методика: Путилов Д.И., Кушников В.А., Богомолов А.С. «Модели и алгоритмы для ликвидации последствий пожара на промышленном предприятии по критерию минимума ущерба». Полиномы подбираются МНК, система решается методом Рунге — Кутты 4-го порядка с шагом 0,01, интеграл целевой функции — методом трапеций. Значения ниже нуля в решении ограничиваются нулём. Планы по умолчанию — примеры; их состав и силу воздействия задаёт пользователь.</footer>
+</div>
+
+<script>
+const SRC={"years": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022], "raw": [[9405, 10962, 22461847, 1942729, 8073903, 738495, 1914455, 3178, 140492, 738495, 56366, 11543, 84905, 230736, 3510346], [8749, 9905, 13418423, 466523, 5435092, 864824, 599582, 6684, 46193, 864824, 285804, 12630, 79559, 774201, 2795008], [7816, 9355, 13767378, 199060, 5468025, 682619, 319008, 1171, 151149, 682619, 36602, 23694, 45238, 779962, 2964863], [7909, 9642, 15517156, 275773, 6245827, 60305, 101857, 8493, 367340, 825799, 328566, 249142, 94869, 156851, 2057425], [8559, 9461, 18170365, 1492617, 7290548, 103717, 229403, 2103, 421388, 887695, 37876, 53566, 76110, 408854, 2377299], [8310, 8419, 20876301, 639284, 13250190, 96470, 525151, 5393, 118900, 716382, 33206, 28481, 31620, 353251, 2344942], [8471, 8397, 16248694, 773710, 7042790, 115668, 76044, 57751, 218134, 795174, 112616, 200706, 142093, 2369300, 1585317], [7746, 8140, 18701109, 237505, 11141608, 137796, 334971, 8894, 690213, 866418, 130223, 60224, 102227, 223957, 1689161]], "U": [[0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, -1, 0, 0, -1], [1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, 0, 0, -1], [1, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, -1, 0, 0, 0], [0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, -1], [1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0, -1, 0, 0, 0, 0, 1, 0], [0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 1, -1], [1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, -1, 1, 0, 0, 1, 1, 0], [0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, -1, -1, -1, 1, 0, 1, 0, 0], [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0], [0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0], [0, 1, 0, 1, 1, 0, 1, 1, 1, 0, 0, 0, -1, -1, 1, 0, 0, 0, 1, -1], [1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 1, 0, 0, -1, 1, 0, 0, 1, 1, -1], [0, 0, 0, 1, 1, 0, 0, 0, 1, -1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0], [0, 0, 0, -1, -1, -1, -1, 0, 1, 0, -1, -1, 1, 0, -1, 1, 0, 0, 0, -1], [0, 0, 0, 0, -1, 1, 0, 1, -1, 0, 1, 0, 0, -1, 0, 1, 0, 0, 0, 0]], "limits": {"last": [0.8236044657097289, 0.7425652253238461, 0.8325721834005904, 0.12225328391144621, 0.84086401779899, 0.1593341535387547, 0.17496937770801613, 0.15400599123824696, 1, 0.9760311818811641, 0.39633741774864106, 0.24172560226698028, 0.719437269957, 0.09452454311399991, 0.48119501610382565], "mean": [0.8900186071238703, 0.8470283707352673, 0.7744313780162424, 0.387805054127467, 0.6032742077660773, 0.40469130135148895, 0.2677309599860012, 0.2027389136118855, 0.39006237929450766, 0.8980288837945465, 0.38852886482472315, 0.32109499803325015, 0.5776331346371743, 0.2794660870299245, 0.6881216623660459], "median": [0.8921318447634237, 0.8582375478927202, 0.7661671589161836, 0.28460145496361045, 0.5408729233316655, 0.14654079905275524, 0.17080030609233438, 0.10456095998337692, 0.2675137964657287, 0.9130236173460479, 0.2571507703170748, 0.16465911006574563, 0.5787195709851998, 0.1608291478495758, 0.6726175995186799]}, "a": [0.594604, 0.64842, 0.00506578, 19.0273, 5.65685, 19.0273, 0.00506578, 2.37841, 1.09051, 0.272627, 19.0273, 19.0273, 0.840896, 9.51366, 0.192776], "b": [0.25, 0.25, 0.420448, 8, 0.229251, 2.18102, 19.0273, 19.0273, 0, 0, 0.00506578, 0.00506578, 0.026278, 0.00506578, 2.82843]};
+// Модель системной динамики последствий пожаров на промышленных предприятиях
+const NX=15, NE=5;
+function normalize(raw){const mx=[];for(let j=0;j<NX;j++){let m=0;for(const r of raw)m=Math.max(m,r[j]);mx.push(m||1)}return{X:raw.map(r=>r.map((v,j)=>v/mx[j])),mx}}
+function quadfit(x,y){
+  let s=[0,0,0,0,0],t=[0,0,0];const n=x.length;
+  for(let k=0;k<n;k++){let p=1;for(let q=0;q<5;q++){s[q]+=p;if(q<3)t[q]+=p*y[k];p*=x[k]}}
+  const A=[[s[0],s[1],s[2]],[s[1],s[2],s[3]],[s[2],s[3],s[4]]],B=t.slice();
+  for(let d=0;d<3;d++)A[d][d]+=1e-9*(1+A[d][d]);
+  for(let c=0;c<3;c++){let p=c;for(let r=c+1;r<3;r++)if(Math.abs(A[r][c])>Math.abs(A[p][c]))p=r;[A[c],A[p]]=[A[p],A[c]];[B[c],B[p]]=[B[p],B[c]];
+    for(let r=0;r<3;r++)if(r!==c){const f=A[r][c]/A[c][c];for(let k=c;k<3;k++)A[r][k]-=f*A[c][k];B[r]-=f*B[c]}}
+  const b=[B[0]/A[0][0],B[1]/A[1][1],B[2]/A[2][2]];
+  const my=y.reduce((a,v)=>a+v,0)/n;let ss=0,se=0;for(let k=0;k<n;k++){const pr=b[0]+b[1]*x[k]+b[2]*x[k]*x[k];ss+=(y[k]-my)**2;se+=(y[k]-pr)**2}
+  return{b,r2:ss>0?1-se/ss:0}}
+function build(raw,U){
+  const {X,mx}=normalize(raw);const funcs=[];const eq=[];let num=0;
+  for(let i=0;i<NX;i++){const e={pos:[],neg:[],eP:[],eN:[]};
+    for(let j=0;j<NX;j++)if(U[i][j]){const f=quadfit(X.map(r=>r[j]),X.map(r=>r[i]));num++;const fn={num,i,j,sign:U[i][j],b:f.b,r2:f.r2};funcs.push(fn);(U[i][j]>0?e.pos:e.neg).push(fn)}
+    for(let k=0;k<NE;k++)if(U[i][NX+k])(U[i][NX+k]>0?e.eP:e.eN).push(k);
+    e.hasNeg=e.neg.length>0||e.eN.length>0;eq.push(e)}
+  return{X,mx,funcs,eq}}
+const fv=(fn,x)=>{const v=fn.b[0]+x*(fn.b[1]+x*fn.b[2]);return v>0?v:0};
+function rhs(M,x,e,a,b,d,p){
+  for(let i=0;i<NX;i++){const q=M.eq[i];let P=1;for(const fn of q.pos)P*=fv(fn,x[fn.j]);
+    let Sp=1;if(q.eP.length){Sp=0;for(const k of q.eP)Sp+=e[k]}
+    let v=a[i]*(p?1-p[i]:1)*P*Sp;
+    if(q.hasNeg){let Q=1;for(const fn of q.neg)Q*=fv(fn,x[fn.j]);let Sn=1;if(q.eN.length){Sn=0;for(const k of q.eN)Sn+=e[k]}v-=b[i]*Q*Sn}
+    if(x[i]<=0&&v<0)v=0;d[i]=v}}
+function simulate(M,a,b,Efun,T,h=0.01,x0,Pfun){
+  const x=Float64Array.from(x0||M.X[0]);const out=[Array.from(x)];const n=Math.round(T/h);
+  const k1=new Float64Array(NX),k2=new Float64Array(NX),k3=new Float64Array(NX),k4=new Float64Array(NX),y=new Float64Array(NX);
+  for(let s=0;s<n;s++){const t=s*h,e0=Efun(t),e1=Efun(t+h/2),e2=Efun(t+h),p0=Pfun?Pfun(t):null,p1=Pfun?Pfun(t+h/2):null,p2=Pfun?Pfun(t+h):null;
+    rhs(M,x,e0,a,b,k1,p0);for(let i=0;i<NX;i++)y[i]=x[i]+h/2*k1[i];rhs(M,y,e1,a,b,k2,p1);
+    for(let i=0;i<NX;i++)y[i]=x[i]+h/2*k2[i];rhs(M,y,e1,a,b,k3,p1);for(let i=0;i<NX;i++)y[i]=x[i]+h*k3[i];rhs(M,y,e2,a,b,k4,p2);
+    for(let i=0;i<NX;i++){const v=x[i]+h/6*(k1[i]+2*k2[i]+2*k3[i]+k4[i]);x[i]=v>0?v:0}out.push(Array.from(x))}
+  return out}
+function sse(M,a,b,Efun){const Y=simulate(M,a,b,Efun,0.7);let s=0;for(let k=0;k<8;k++)for(let i=0;i<NX;i++){const d=Y[k*10][i]-M.X[k][i];s+=d*d}return isFinite(s)?s:1e9}
+function calibrate(M,Efun,iters=80,lo=0.005,hi=20){
+  const a=new Array(NX).fill(0.5),b=M.eq.map(q=>q.hasNeg?0.5:0);let best=sse(M,a,b,Efun);let step=2;
+  for(let it=0;it<iters&&step>1.01;it++){let improved=false;
+    for(const arr of [a,b])for(let i=0;i<NX;i++){if(arr===b&&!M.eq[i].hasNeg)continue;
+      for(const m of [step,1/step]){const old=arr[i];const nv=old*m;if(nv<lo||nv>hi)continue;arr[i]=nv;const s=sse(M,a,b,Efun);if(s<best){best=s;improved=true;break}arr[i]=old}}
+    if(!improved)step=Math.sqrt(step)}
+  return{a,b,sse:best}}
+
+(function(){
+const $=id=>document.getElementById(id);
+const nf=(x,d=2)=>isFinite(x)?x.toLocaleString('ru-RU',{minimumFractionDigits:d,maximumFractionDigits:d}):'—';
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const sub=n=>String(n).replace(/\d/g,d=>'₀₁₂₃₄₅₆₇₈₉'[d]);
+const XN=['Погибшие, чел.','Травмированные, чел.','Прямой ущерб','Неисправность оборудования, нарушение техпроцесса','Нарушения при эксплуатации электрооборудования','Нарушения при эксплуатации газового оборудования','Нарушения при электрогазосварочных работах','Взрывы','Самовозгорание веществ и материалов','Нарушения при эксплуатации печей','Нарушения при эксплуатации теплогенерирующих установок','Нарушения ПБ при огневых работах','Грозовые разряды','Неустановленные причины','Установленный поджог'];
+const EN=['Объём АХОВ на предприятии','Силы пожарной охраны','Климатический район','Цены на оборудование','Инструктажи по пожарной безопасности'];
+const xl=i=>'X'+sub(i+1), el_=k=>'E'+sub(k+1);
+const COLORS=['--c1','--c2','--c3','--c4','--c5','--c6','--c7'];
+
+/* ===== state ===== */
+const clone=o=>JSON.parse(JSON.stringify(o));
+let raw=clone(SRC.raw), U=clone(SRC.U), coef={a:SRC.a.slice(),b:SRC.b.slice()}, M=null, dirty=false;
+const DEFAULT_PLANS=[
+ {name:'Без мероприятий',E:[1,1,1,1,1],p:{},fixed:true},
+ {name:'План 1. Модернизация электрооборудования и техпроцессов',E:[1,1,1,1,1],p:{4:0.3,5:0.4,11:0.3}},
+ {name:'План 2. Обучение персонала и контроль огневых работ',E:[1,1,1,1,1.6],p:{6:0.3,7:0.4,12:0.4}},
+ {name:'План 3. Комплексный',E:[0.8,1.3,1,1,1.3],p:{4:0.3,5:0.4,6:0.2,7:0.3,11:0.3,12:0.3}}];
+let plans=clone(DEFAULT_PLANS);
+let Xstar=SRC.limits.median.slice(), gamma=new Array(NX).fill(1/15);
+
+/* ===== tabs ===== */
+const tabs=[...document.querySelectorAll('nav.tabs button')];
+function show(name){tabs.forEach(b=>b.setAttribute('aria-selected',b.dataset.tab===name));['data','links','check','plans'].forEach(t=>$('p-'+t).hidden=t!==name);try{localStorage.setItem('sdf-tab',name)}catch(e){}renderAll()}
+tabs.forEach(b=>b.addEventListener('click',()=>show(b.dataset.tab)));
+
+/* ===== chart helpers ===== */
+const NS='http://www.w3.org/2000/svg';
+function el(t,a,p){const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e}
+function ticks(a,b,n){const span=b-a||1;const st=Math.pow(10,Math.floor(Math.log10(span/n)));const m=[1,2,2.5,5,10].find(m=>span/(st*m)<=n)*st;const out=[];for(let x=Math.ceil(a/m-1e-9)*m;x<=b+1e-9;x+=m)out.push(+x.toFixed(10));return out}
+function chart(svg,o){
+  svg.innerHTML='';const vb=svg.viewBox.baseVal,W=vb.width,H=vb.height;const m={l:46,r:14,t:12,b:34};const iw=W-m.l-m.r,ih=H-m.t-m.b;
+  const X=x=>m.l+(x-o.xmin)/(o.xmax-o.xmin)*iw, Y=y=>m.t+ih-(y-o.ymin)/(o.ymax-o.ymin)*ih;
+  ticks(o.ymin,o.ymax,5).forEach(t=>{el('line',{x1:m.l,x2:W-m.r,y1:Y(t),y2:Y(t),class:'grid'},svg);const tx=el('text',{x:m.l-6,y:Y(t)+4,'text-anchor':'end'},svg);tx.textContent=nf(t,t%1?1:0)});
+  (o.xt||ticks(o.xmin,o.xmax,7)).forEach(t=>{const tx=el('text',{x:X(t),y:m.t+ih+16,'text-anchor':'middle'},svg);tx.textContent=o.xFmt?o.xFmt(t):t});
+  el('line',{x1:m.l,x2:W-m.r,y1:m.t+ih,y2:m.t+ih,class:'axis'},svg);el('line',{x1:m.l,x2:m.l,y1:m.t,y2:m.t+ih,class:'axis'},svg);
+  (o.vlines||[]).forEach(v=>{el('line',{x1:X(v.x),x2:X(v.x),y1:m.t,y2:m.t+ih,stroke:css('--muted'),'stroke-dasharray':'4 4'},svg);if(v.label){const t=el('text',{x:X(v.x)+4,y:m.t+11},svg);t.textContent=v.label}});
+  (o.hlines||[]).forEach(v=>el('line',{x1:m.l,x2:W-m.r,y1:Y(v.y),y2:Y(v.y),stroke:v.color,'stroke-dasharray':'5 4','stroke-width':1.2},svg));
+  (o.series||[]).forEach(s=>{const d=s.pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+','+Y(Math.max(o.ymin,Math.min(o.ymax,p[1]))).toFixed(1)).join('');el('path',{d,fill:'none',stroke:s.color,'stroke-width':s.w||2,'stroke-dasharray':s.dash||''},svg)});
+  (o.dots||[]).forEach(s=>s.pts.forEach(p=>el('circle',{cx:X(p[0]),cy:Y(p[1]),r:3.6,fill:s.color},svg)));
+}
+
+/* ===== model ===== */
+function rebuildModel(calib){
+  M=build(raw,U);
+  if(calib){const c=calibrate(M,()=>[1,1,1,1,1],80);coef={a:c.a,b:c.b};}
+}
+const yearOf=t=>Math.round(2015+t*10);
+function Efun(plan,t0,rampT){return t=>{const w=t<=t0?0:(rampT<=0?1:Math.min(1,(t-t0)/(rampT/10)));return plan.E.map(m=>1+(m-1)*w)}}
+function Pfun(plan,t0,rampT){return t=>{const w=t<=t0?0:(rampT<=0?1:Math.min(1,(t-t0)/(rampT/10)));const p=new Array(NX).fill(0);for(const k in plan.p)p[k-1]=Math.min(1,Math.max(0,plan.p[k]))*w;return p}}
+let simCache=null;
+function runPlans(){
+  const T=parseFloat($('horizon').value), tS=parseFloat($('tStart').value), rampT=parseFloat($('ramp').value)||0, over=$('mode').value==='over';
+  const h=0.01, res=plans.map(pl=>{const Y=simulate(M,coef.a,coef.b,Efun(pl,0.7,rampT),T,h,null,Pfun(pl,0.7,rampT));
+    let J=0;const s0=Math.round(tS/h),s1=Math.round(T/h);const Ji=new Array(NX).fill(0);
+    for(let s=s0;s<=s1;s++){const w=(s===s0||s===s1)?h/2:h;for(let i=0;i<NX;i++){let d=Y[s][i]-Xstar[i];if(over&&d<0)d=0;const v=gamma[i]*d*d*w;J+=v;Ji[i]+=v}}
+    return{Y,J,Ji}});
+  simCache={T,res,h};return simCache}
+
+/* ===== tab 1 ===== */
+function renderData(){
+  const head='<tr><th>Год</th>'+XN.map((n,i)=>`<th class="n" title="${n}">${xl(i)}</th>`).join('')+'</tr>';
+  $('tRaw').innerHTML=head+raw.map((r,k)=>`<tr><td class="n">${SRC.years[k]}</td>`+r.map((v,i)=>`<td class="n"><input type="number" data-k="${k}" data-i="${i}" value="${v}" aria-label="${xl(i)} ${SRC.years[k]}"></td>`).join('')+'</tr>').join('');
+  $('tRaw').querySelectorAll('input').forEach(inp=>inp.addEventListener('change',()=>{const v=parseFloat(inp.value);if(isFinite(v)&&v>=0){raw[+inp.dataset.k][+inp.dataset.i]=v;markDirty();renderNorm()}}));
+  renderNorm();
+}
+function renderNorm(){
+  const {X}=normalize(raw);
+  $('tNorm').innerHTML='<tr><th>Год</th>'+XN.map((n,i)=>`<th class="n" title="${n}">${xl(i)}</th>`).join('')+'</tr>'+X.map((r,k)=>`<tr><td class="n">${SRC.years[k]}</td>`+r.map(v=>`<td class="n">${nf(v,3)}</td>`).join('')+'</tr>').join('')+
+    `<tr><td colspan="16" class="note" style="padding-top:8px">${XN.map((n,i)=>xl(i)+' — '+n).join('; ')}.</td></tr>`;
+}
+
+/* ===== tab 2 ===== */
+function renderLinks(){
+  let h='<tr><th class="rh"></th>'+XN.map((n,j)=>`<th title="${n}">${xl(j)}</th>`).join('')+EN.map((n,k)=>`<th title="${n}">${el_(k)}</th>`).join('')+'</tr>';
+  for(let i=0;i<NX;i++){h+=`<tr><th class="rh" title="${XN[i]}">${xl(i)}</th>`;for(let j=0;j<NX+NE;j++){const v=U[i][j];const dis=j===i?' disabled':'';
+    h+=`<td${j===NX?' class="sep"':''}><button type="button" data-i="${i}" data-j="${j}" class="${v>0?'p':v<0?'m':''}"${dis} aria-label="${xl(i)} от ${j<NX?xl(j):el_(j-NX)}: ${v}">${v>0?'+1':v<0?'−1':'0'}</button></td>`}h+='</tr>'}
+  $('tMx').innerHTML=h;
+  $('tMx').querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{const i=+b.dataset.i,j=+b.dataset.j;U[i][j]=U[i][j]===0?1:U[i][j]===1?-1:0;markDirty();renderLinks()}));
+  $('mxNames').textContent='Внешние факторы: '+EN.map((n,k)=>el_(k)+' — '+n).join('; ')+'.';
+  // equations
+  const lines=[];
+  M.eq.forEach((q,i)=>{const P=q.pos.map(f=>`f${sub(f.num)}(${xl(f.j)})`).join('·');const Ep=q.eP.length?'('+q.eP.map(el_).join(' + ')+')':'';
+    let s=`d${xl(i)}/dt = ${nf(coef.a[i],3)}·(1 − p${sub(i+1)})`+(P?'·'+P:'')+(Ep?'·'+Ep:'');
+    if(q.hasNeg){const N=q.neg.map(f=>`f${sub(f.num)}(${xl(f.j)})`).join('·');const En=q.eN.length?'('+q.eN.map(el_).join(' + ')+')':'';s+=` − ${nf(coef.b[i],3)}`+(N?'·'+N:'')+(En?'·'+En:'')}
+    lines.push(s)});
+  $('eqs').textContent=lines.join('\n')+`\n\nНачальные условия: X̃_i(0) — нормированные значения 2015 г.; всего функций f: ${M.funcs.length}.`;
+  const pf=b=>{const t=[nf(b[0],3)];[[b[1],''],[b[2],'²']].forEach(([c,p],k)=>t.push((c<0?' − ':' + ')+nf(Math.abs(c),3)+'·X̃'+p));return t.join('')};
+  $('tPoly').innerHTML='<tr><th>Функция</th><th>Уравнение</th><th>Знак связи</th><th>Полином</th><th class="n">R²</th></tr>'+
+    M.funcs.map(f=>`<tr><td>f${sub(f.num)}(${xl(f.j)})</td><td>d${xl(f.i)}/dt</td><td>${f.sign>0?'+1':'−1'}</td><td style="font-family:var(--f-num);white-space:nowrap">${pf(f.b).replace(/X̃/g,'X̃'+sub(f.j+1))}</td><td class="n">${nf(f.r2,2)}</td></tr>`).join('');
+}
+
+/* ===== tab 3 ===== */
+let fitSim=null;
+function renderCheck(){
+  fitSim=simulate(M,coef.a,coef.b,()=>[1,1,1,1,1],0.7);
+  const err=[];let s13=0,sall=0,n13=0,nall=0,sse=0;
+  for(let i=0;i<NX;i++){err[i]=[];for(let k=0;k<8;k++){const m=fitSim[k*10][i],f=M.X[k][i];const e=f>0?100*Math.abs(m-f)/f:0;err[i].push(e);sse+=(m-f)**2;if(k>0){sall+=e;nall++;if(i<3){s13+=e;n13++}}}}
+  $('kX13').textContent=nf(s13/n13,1)+' %';$('kAll').textContent=nf(sall/nall,1)+' %';$('kSse').textContent=nf(sse,3);
+  $('tErr').innerHTML='<tr><th>Переменная</th>'+SRC.years.map(y=>`<th class="n">${y}</th>`).join('')+'<th class="n">Среднее</th></tr>'+
+    err.map((r,i)=>{const mean=r.slice(1).reduce((a,v)=>a+v,0)/7;return`<tr><td title="${XN[i]}">${xl(i)} ${XN[i].length>28?XN[i].slice(0,28)+'…':XN[i]}</td>`+r.map((e,k)=>`<td class="n">${k===0?'—':nf(e,1)}</td>`).join('')+`<td class="n" style="${mean<=15?'color:var(--ok);font-weight:600':''}">${nf(mean,1)}</td></tr>`}).join('');
+  drawFit();
+  const sel=[0,1,2,4,9,14];const ser=sel.map((i,c)=>({pts:fitSim.map((x,s)=>[2015+s/10,x[i]]),color:css(COLORS[c%7])}));
+  chart($('chAll'),{xmin:2015,xmax:2022,ymin:0,ymax:Math.max(1.05,...fitSim.flatMap(x=>sel.map(i=>x[i])))*1.02,series:ser});
+  $('legAll').innerHTML=sel.map((i,c)=>`<span><i style="background:var(${COLORS[c%7]})"></i>${xl(i)} ${XN[i]}</span>`).join('');
+}
+function drawFit(){const i=+$('selVar').value;const pts=fitSim.map((x,s)=>[2015+s/10,x[i]]);const fact=M.X.map((r,k)=>[2015+k,r[i]]);
+  const ymax=Math.max(1.05,...pts.map(p=>p[1]),...fact.map(p=>p[1]))*1.05;
+  chart($('chFit'),{xmin:2015,xmax:2022,ymin:0,ymax,series:[{pts,color:css('--c2'),w:2.4}],dots:[{pts:fact,color:css('--c1')}]})}
+
+/* ===== tab 4 ===== */
+function renderLim(){
+  $('tLim').innerHTML='<tr><th>Характеристика</th><th class="n">X*_i</th><th class="n">γ_i</th></tr>'+XN.map((n,i)=>`<tr><td>${xl(i)} ${n}</td><td class="n"><input type="number" step="0.01" min="0" max="1.5" data-xs="${i}" value="${+Xstar[i].toFixed(3)}"></td><td class="n"><input type="number" step="0.01" min="0" data-g="${i}" value="${+gamma[i].toFixed(4)}"></td></tr>`).join('');
+  $('tLim').querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{const v=parseFloat(inp.value);if(!isFinite(v))return;if(inp.dataset.xs!=null)Xstar[+inp.dataset.xs]=v;else gamma[+inp.dataset.g]=v;renderPlans(false)}));
+}
+function planEditor(){
+  const k=+$('selPlan').value;const pl=plans[k];$('planName').value=pl.name;$('planName').disabled=!!pl.fixed;
+  $('planE').innerHTML=EN.map((n,e)=>`<label title="${n}"><span>${el_(e)}</span><input type="number" step="0.05" min="0" data-e="${e}" value="${pl.E[e]}" ${pl.fixed?'disabled':''} aria-label="${n}"></label>`).join('');
+  $('planP').innerHTML=XN.map((n,i)=>`<label title="${n}"><span>p${sub(i+1)}</span><input type="number" step="0.05" min="0" max="1" data-p="${i+1}" value="${pl.p[i+1]||0}" ${pl.fixed?'disabled':''} aria-label="p для ${n}"></label>`).join('');
+  $('planE').querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{const v=parseFloat(inp.value);if(isFinite(v)){pl.E[+inp.dataset.e]=v;renderPlans(false)}}));
+  $('planP').querySelectorAll('input').forEach(inp=>inp.addEventListener('input',()=>{const v=parseFloat(inp.value);if(isFinite(v)){if(v)pl.p[+inp.dataset.p]=v;else delete pl.p[+inp.dataset.p];renderPlans(false)}}));
+}
+function planOptions(){const o=plans.map((p,k)=>`<option value="${k}">${p.name}</option>`).join('');['selPlan','selPlanR'].forEach(id=>{const v=$(id).value;$(id).innerHTML=o;$(id).value=v||'1'})}
+function renderPlans(full=true){
+  if(full){planOptions();planEditor()}
+  const {T,res,h}=runPlans();const base=res[0].J;let best=0;res.forEach((r,k)=>{if(r.J<res[best].J)best=k});
+  $('bestBox').innerHTML=`<span class="pill ${best===0?'mid':'ok'}">Оптимальный: ${plans[best].name}</span> <span class="note">J = ${nf(res[best].J,5)}${best?`, на ${nf(100*(base-res[best].J)/base,1)} % меньше, чем без мероприятий`:''}</span>`;
+  $('tJ').innerHTML='<tr><th>План</th><th class="n">J</th><th class="n">ΔJ к «без мероприятий»</th><th class="n">X̃₁ в '+yearOf(T)+'</th><th class="n">X̃₂</th><th class="n">X̃₃</th></tr>'+
+    res.map((r,k)=>{const e=r.Y[r.Y.length-1];return`<tr class="${k===best?'best':''}"><td>${plans[k].name}</td><td class="n">${nf(r.J,5)}</td><td class="n">${k?nf(100*(r.J-base)/base,1)+' %':'—'}</td><td class="n">${nf(e[0],3)}</td><td class="n">${nf(e[1],3)}</td><td class="n">${nf(e[2],3)}</td></tr>`}).join('');
+  // bars
+  const svg=$('chJ');svg.innerHTML='';const W=640,rowH=34,ml=250,mx=Math.max(...res.map(r=>r.J))*1.12||1;
+  res.forEach((r,k)=>{const y=8+k*rowH;el('rect',{x:ml,y,width:(W-ml-70)*r.J/mx,height:rowH-12,fill:css(k===best?'--c3':k===0?'--c6':'--c2')},svg);
+    const t=el('text',{x:ml-8,y:y+16,'text-anchor':'end'},svg);t.textContent=plans[k].name.length>38?plans[k].name.slice(0,37)+'…':plans[k].name;t.style.fill=css('--ink');
+    const v=el('text',{x:ml+(W-ml-70)*r.J/mx+6,y:y+16},svg);v.textContent=nf(r.J,4)});
+  drawPlanVar();drawRadar();
+}
+function drawPlanVar(){
+  if(!simCache)return;const i=+$('selVar2').value;const {T,res}=simCache;
+  const ser=res.map((r,k)=>({pts:r.Y.map((x,s)=>[2015+s/10,x[i]]),color:css(['--c6','--c1','--c2','--c3'][k%4]),w:k?2.2:1.6,dash:k?'':'5 4'}));
+  const fact=M.X.map((r,k)=>[2015+k,r[i]]);
+  const ymax=Math.max(1.05,...ser.flatMap(s=>s.pts.map(p=>p[1])))*1.05;
+  chart($('chPlan'),{xmin:2015,xmax:2015+T*10,ymin:0,ymax,series:ser,dots:[{pts:fact,color:css('--ink')}],vlines:[{x:2022,label:'начало мероприятий'}],hlines:[{y:Xstar[i],color:css('--muted')}],xt:ticks(2015,2015+T*10,8).filter(x=>x%1===0)});
+  $('legPlan').innerHTML=res.map((r,k)=>`<span><i style="background:var(${[ '--c6','--c1','--c2','--c3'][k]})"></i>${plans[k].name}</span>`).join('')+`<span><i style="background:var(--ink);height:8px;width:8px;border-radius:50%"></i>статистика</span><span><i style="background:var(--muted);height:2px"></i>X* — допустимое значение (пунктир)</span>`;
+}
+function drawRadar(){
+  if(!simCache)return;const k=+$('selPlanR').value;const yr=+$('yearR').value;$('yearRo').textContent=yr;
+  const r=simCache.res[k];const s=Math.min(r.Y.length-1,Math.round((yr-2015)/10/simCache.h));const v=r.Y[s];
+  const svg=$('chRadar');svg.innerHTML='';const cx=320,cy=232,R=170;const mxv=Math.max(1,...v,...Xstar);
+  const ang=i=>-Math.PI/2+2*Math.PI*i/NX;const P=(i,val)=>[cx+R*val/mxv*Math.cos(ang(i)),cy+R*val/mxv*Math.sin(ang(i))];
+  [0.25,0.5,0.75,1].forEach(q=>el('polygon',{points:Array.from({length:NX},(_,i)=>P(i,q*mxv).join(',')).join(' '),fill:'none',stroke:css('--soft')},svg));
+  for(let i=0;i<NX;i++){const [x,y]=P(i,mxv);el('line',{x1:cx,y1:cy,x2:x,y2:y,stroke:css('--soft')},svg);const [lx,ly]=P(i,mxv*1.12);const t=el('text',{x:lx,y:ly+4,'text-anchor':'middle'},svg);t.textContent=xl(i);t.style.fill=css(v[i]>Xstar[i]?'--ember':'--ink');if(v[i]>Xstar[i])t.style.fontWeight='700'}
+  el('polygon',{points:Xstar.map((x,i)=>P(i,x).join(',')).join(' '),fill:'none',stroke:css('--c1'),'stroke-width':2},svg);
+  el('polygon',{points:v.map((x,i)=>P(i,x).join(',')).join(' '),fill:css('--c2'),'fill-opacity':0.15,stroke:css('--c2'),'stroke-width':2},svg);
+  const t=el('text',{x:cx+4,y:cy-R*1/mxv*1-4},svg);t.textContent='1,0';
+  const over=v.map((x,i)=>x>Xstar[i]?i:-1).filter(i=>i>=0);
+  $('radarNote').textContent=over.length?`В ${yr} г. по плану «${plans[k].name}» допустимые значения превышают: ${over.map(i=>xl(i)+' ('+XN[i].toLowerCase()+')').join(', ')}.`:`В ${yr} г. по плану «${plans[k].name}» все характеристики в пределах допустимых значений.`;
+}
+
+/* ===== wiring ===== */
+function markDirty(){dirty=true;$('status').textContent='Данные изменены — нажмите «Пересчитать модель»';$('status').className='status dirty'}
+function renderAll(){
+  const tab=tabs.find(b=>b.getAttribute('aria-selected')==='true').dataset.tab;
+  if(tab==='links')renderLinks(); if(tab==='check')renderCheck(); if(tab==='plans')renderPlans(true);
+}
+function recompute(){
+  $('rebuild').disabled=true;$('status').textContent='Подбор полиномов и калибровка…';$('status').className='status busy';
+  setTimeout(()=>{try{rebuildModel(true);dirty=false;$('status').textContent=`Модель пересчитана: ${M.funcs.length} полиномов, калибровка по данным ${SRC.years[0]}–${SRC.years[7]}`;$('status').className='status ok'}
+    catch(e){$('status').textContent='Ошибка расчёта: проверьте данные';$('status').className='status dirty'}
+    $('rebuild').disabled=false;renderAll()},30)}
+$('rebuild').addEventListener('click',recompute);
+$('resetAll').addEventListener('click',()=>{raw=clone(SRC.raw);U=clone(SRC.U);coef={a:SRC.a.slice(),b:SRC.b.slice()};plans=clone(DEFAULT_PLANS);Xstar=SRC.limits[$('preset').value].slice();gamma=new Array(NX).fill(1/15);
+  rebuildModel(false);dirty=false;$('status').textContent='Модель построена по исходным данным';$('status').className='status ok';renderData();renderLim();renderAll()});
+const opts=XN.map((n,i)=>`<option value="${i}">${xl(i)} — ${n}</option>`).join('');$('selVar').innerHTML=opts;$('selVar2').innerHTML=opts;
+$('selVar').addEventListener('change',drawFit);$('selVar2').addEventListener('change',drawPlanVar);
+$('horizon').innerHTML=[2024,2025,2026,2027,2028,2029,2030].map(y=>`<option value="${((y-2015)/10).toFixed(1)}" ${y===2027?'selected':''}>${y}</option>`).join('');
+['horizon','tStart','ramp','mode'].forEach(id=>$(id).addEventListener('change',()=>{if(id==='horizon'){$('yearR').max=yearOf(+$('horizon').value);if(+$('yearR').value>+$('yearR').max)$('yearR').value=$('yearR').max}renderPlans(false)}));
+$('preset').addEventListener('change',()=>{Xstar=SRC.limits[$('preset').value].slice();renderLim();renderPlans(false)});
+$('selPlan').addEventListener('change',planEditor);$('selPlanR').addEventListener('change',drawRadar);$('yearR').addEventListener('input',drawRadar);
+$('planName').addEventListener('input',()=>{const k=+$('selPlan').value;if(plans[k].fixed)return;plans[k].name=$('planName').value||('План '+k);planOptions();$('selPlan').value=k;renderPlans(false)});
+rebuildModel(false);renderData();renderLim();
+let start='data';try{start=localStorage.getItem('sdf-tab')||'data'}catch(e){}
+show(['data','links','check','plans'].includes(start)?start:'data');
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',renderAll);
+})();
+</script>
+
+</body>
+</html>
